@@ -10,6 +10,8 @@ from rasterio.plot import show
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Cursor
 from shapely.geometry import Point
+import pyproj
+from rasterio.warp import transform
 import sys
 
 # Path to your GeoTIFF file
@@ -17,7 +19,17 @@ geo_tiff_path = "./images/Fast-Ortho-Output-orthophoto.tif"
 
 # List to store waypoints
 waypoints = []
-waypoints_pixel = []
+
+
+# Coordinate Reference System
+# Function to reproject from the image's CRS to WGS84 (EPSG:4326)
+def reproject_to_wgs84(x, y, src_crs, dst_crs='EPSG:4326'):
+    """Reproject coordinates from one CRS to another (WGS84 by default)."""
+    # Use pyproj to reproject coordinates
+    transformer = pyproj.Transformer.from_crs(src_crs, dst_crs, always_xy=True)
+    lon, lat = transformer.transform(x, y)
+    return lat, lon
+
 
 def onclick(event):
     """Handle mouse click events to add numbered waypoints and draw lines."""
@@ -27,9 +39,15 @@ def onclick(event):
         x_pixel, y_pixel = int(event.xdata), int(event.ydata)
         
         # Convert pixel coordinates to geographic coordinates (if needed)
-        x_coord,y_coord = rasterio.transform.xy(transform, y_pixel, x_pixel, offset='center')
-        waypoint_geo = Point(x_coord, y_coord)  # Shapely Point (for geographic reference)
+        # x_coord,y_coord = rasterio.transform.xy(transform, y_pixel, x_pixel, offset='center')
+        # waypoint_geo = Point(x_coord, y_coord)  # Shapely Point (for geographic reference)
         
+        geo_coords = dataset.xy(y_pixel, x_pixel)  # This converts pixel to geographic coordinates
+        # Reproject coordinates to WGS84 (if necessary)
+        lat, lon = reproject_to_wgs84(geo_coords[0], geo_coords[1], dataset.crs)
+        waypoint_geo = Point(lon, lat)  # Shapely Point (for geographic reference)
+        
+
         # Generate the waypoint number
         waypoint_number = len(waypoints) + 1
 
@@ -95,8 +113,29 @@ with rasterio.open(geo_tiff_path) as dataset:
 
 
 
-
 # Print all waypoints after the interaction
 print("Waypoints (georeferenced):")
 for waypoint in waypoints:
     print(waypoint)
+
+
+# Export waypoints to MAVLink .waypoints file
+waypoints_filename = 'gen2.waypoints'
+with open(waypoints_filename, 'w') as f:
+    # Write header for the MAVLink file (QGroundControl WPL version)
+    f.write("QGC WPL 110\n")  # Write header
+    
+    # Add home point (index 0)
+    home_point = waypoints[0] if waypoints else None
+    if home_point:
+        # Home point command = 3, current WP = 1
+        f.write(f"0\t1\t0\t3\t0\t0\t0\t0\t{home_point['geo'].y}\t{home_point['geo'].x}\t100.000000\t1\n")
+    
+    # Add waypoints starting from index 1 (regular waypoints)
+    for index, waypoint in enumerate(waypoints[1:], start=1):
+        # Waypoint command = 16
+        f.write(f"{index}\t0\t0\t16\t0\t0\t0\t0\t{waypoint['geo'].y}\t{waypoint['geo'].x}\t100.000000\t1\n")
+
+print(f"\nWaypoints have been exported to {waypoints_filename}")
+
+
