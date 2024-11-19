@@ -15,7 +15,7 @@ from rasterio.warp import transform
 import sys
 
 # Path to your GeoTIFF file
-geo_tiff_path = "./images/Fast-Ortho-Output-orthophoto.tif"
+geo_tiff_path = "./images/ESPG-4326-orthophoto.tif"
 
 # List to store waypoints
 waypoints = []
@@ -25,6 +25,13 @@ waypoints = []
 # Function to reproject from the image's CRS to WGS84 (EPSG:4326)
 def reproject_to_wgs84(x, y, src_crs, dst_crs='EPSG:4326'):
     """Reproject coordinates from one CRS to another (WGS84 by default)."""
+
+    print(f"CRS: {src_crs}, {dst_crs}")
+
+    if (src_crs == dst_crs):
+        print(f"Same CRS: {src_crs}")
+        return x,y
+
     # Use pyproj to reproject coordinates
     transformer = pyproj.Transformer.from_crs(src_crs, dst_crs, always_xy=True)
     lon, lat = transformer.transform(x, y)
@@ -35,18 +42,20 @@ def onclick(event):
     """Handle mouse click events to add numbered waypoints and draw lines."""
     # Check if the toolbar is inactive (not in zoom or pan mode)
     if plt.get_current_fig_manager().toolbar.mode == '' and event.inaxes:
-        # Get pixel coordinates from the click
-        x_pixel, y_pixel = int(event.xdata), int(event.ydata)
+        x_pixel, y_pixel = event.xdata, event.ydata # Get pixel coordinates from the click
         
-        # Convert pixel coordinates to geographic coordinates (if needed)
-        # x_coord,y_coord = rasterio.transform.xy(transform, y_pixel, x_pixel, offset='center')
-        # waypoint_geo = Point(x_coord, y_coord)  # Shapely Point (for geographic reference)
+        # Debug: Print event coordinates
+        print(f"Clicked pixel coordinates: x={x_pixel}, y={y_pixel}")
         
         geo_coords = dataset.xy(y_pixel, x_pixel)  # This converts pixel to geographic coordinates
-        # Reproject coordinates to WGS84 (if necessary)
         lat, lon = reproject_to_wgs84(geo_coords[0], geo_coords[1], dataset.crs)
         waypoint_geo = Point(lon, lat)  # Shapely Point (for geographic reference)
         
+        # Debug: Print raw geographic coordinates
+        print(f"Raw geographic coordinates (source CRS): {geo_coords}")
+
+        # Debug: Print reprojected geographic coordinates
+        print(f"Reprojected coordinates (WGS84): lat={lat}, lon={lon}")
 
         # Generate the waypoint number
         waypoint_number = len(waypoints) + 1
@@ -54,7 +63,7 @@ def onclick(event):
         # Store both the pixel coordinates and geographic coordinates
         waypoint = {
             'number': waypoint_number,
-            'pixel': (x_pixel, y_pixel),
+            'pixel': (event.xdata, event.ydata),
             'geo': waypoint_geo
         }
         waypoints.append(waypoint)
@@ -106,6 +115,8 @@ with rasterio.open(geo_tiff_path) as dataset:
     except AttributeError:
         mng.resize(*mng.window.maxsize())  # For other backends, resize to screen size
 
+
+    print("Source CRS:", dataset.crs)
 
     # Connect the onclick event to the plot
     fig.canvas.mpl_connect('button_press_event', onclick)
