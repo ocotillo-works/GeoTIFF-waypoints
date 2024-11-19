@@ -17,32 +17,55 @@ geo_tiff_path = "./images/Fast-Ortho-Output-orthophoto.tif"
 
 # List to store waypoints
 waypoints = []
+waypoints_pixel = []
 
 def onclick(event):
-    """Handle mouse click events to add waypoints."""
+    """Handle mouse click events to add numbered waypoints and draw lines."""
     # Check if the toolbar is inactive (not in zoom or pan mode)
-    if plt.get_current_fig_manager().toolbar.mode == '' and event.inaxes:  # Ensure the click is within the plot
+    if plt.get_current_fig_manager().toolbar.mode == '' and event.inaxes:
         # Get pixel coordinates from the click
         x_pixel, y_pixel = int(event.xdata), int(event.ydata)
         
-        # Convert pixel coordinates to geographic coordinates
+        # Convert pixel coordinates to geographic coordinates (if needed)
         x_coord,y_coord = rasterio.transform.xy(transform, y_pixel, x_pixel, offset='center')
+        waypoint_geo = Point(x_coord, y_coord)  # Shapely Point (for geographic reference)
         
-        # Add the waypoint as a Shapely Point
-        waypoint = Point(x_coord, y_coord)
+        # Generate the waypoint number
+        waypoint_number = len(waypoints) + 1
+
+        # Store both the pixel coordinates and geographic coordinates
+        waypoint = {
+            'number': waypoint_number,
+            'pixel': (x_pixel, y_pixel),
+            'geo': waypoint_geo
+        }
         waypoints.append(waypoint)
         
-        # Plot the waypoint on the map
-        ax.plot(event.xdata, event.ydata, 'ro', markersize=6, label="Waypoint" if len(waypoints) == 1 else "")
-        
-        # Annotate the point with its number
-        ax.text(event.xdata, event.ydata, str(len(waypoints)), color='yellow', fontsize=12, ha='left', va='bottom')
 
-        fig.canvas.draw()  # Redraw the figure to show the point
+        ax.plot(event.xdata, event.ydata, 'ro', markersize=6) # Plot the waypoint on the map        
+        # Annotate the point with its number
+        ax.text(event.xdata, event.ydata, str(waypoint_number), color='yellow', fontsize=10, ha='left', va='bottom')
         
-        # Print feedback to the console
-        print(f"Added waypoint: {waypoint}")
-        plt.pause(0.1)  # Ensure console output updates in real time
+        # If there are at least two points, draw a line between the last two waypoints (using pixel coordinates)
+        if len(waypoints) > 1:
+            prev_x, prev_y = waypoints[-2]['pixel']
+            curr_x, curr_y = waypoints[-1]['pixel']
+            
+            # Draw a line between the last two waypoints using pixel coordinates
+            # ax.plot([prev_x, curr_x], [prev_y, curr_y], 'g-', linewidth=1)  # Green line
+            
+            # Draw an arrow between the last two waypoints using pixel coordinates
+            ax.annotate('', xy=(curr_x, curr_y), xytext=(prev_x, prev_y),
+                        arrowprops=dict(facecolor='green', edgecolor='green', arrowstyle='->', lw=1))  # Green arrow
+
+
+        # Redraw the figure to show the point and the line
+        fig.canvas.draw()
+        
+        # Print feedback to the console (show both pixel and geographic coordinates)
+        print(f"Added waypoint {len(waypoints)}:")
+        print(f"  Pixel Coordinates: {waypoints[-1]['pixel']}")
+        print(f"  Geographic Coordinates: {waypoints[-1]['geo']}")
         sys.stdout.flush()  # Force the console to update immediately
 
         
