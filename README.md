@@ -1,6 +1,6 @@
-# GeoTIFF-waypoints
-Open a GeoTIFF image, click to add mission waypoints, then export your plan.
+# Geo-Referenced Waypoints with Python
 
+This project allows users to click on a GeoTIFF image, add waypoints at the clicked locations, and view the corresponding geographic coordinates. The project also allows users to draw lines between sequential waypoints and export these waypoints in a format suitable for mission planning software.
 
 ## TODO
 - [x] Zoom/enhance visual size of tif
@@ -9,13 +9,11 @@ Open a GeoTIFF image, click to add mission waypoints, then export your plan.
 - [x] Export plan to a file to use in Mission Planner
 
 ### Usability & Quality of Life
+- [x] Script to set up requirements, environment.
 - [ ] Input GeoTIFFs exceed GitHub 100MB input file size limit. Might need LFS.
-- [ ] Script to set up requirements, environment.
-
-
-# Geo-Referenced Waypoints with Python
-
-This project allows users to click on a GeoTIFF image, add waypoints at the clicked locations, and view the corresponding geographic coordinates. The project also allows users to draw lines between sequential waypoints and export these waypoints in a format suitable for mission planning software.
+- [ ] Pass arguments to script
+- [ ] Directories, naming for inputs, outputs
+- [ ] Add images to README
 
 ## Features
 - Click on a GeoTIFF image to add waypoints with geographic coordinates (latitude, longitude).
@@ -68,7 +66,9 @@ If you want to log detailed output during execution, ensure that logging is prop
 
 To run the script, simply execute the Python file:
 
-`python <your_script_name>.py`
+`python <selected_script_name>.py`
+
+So far, we have `GPT_open_tif.py`.
 
 The script will open the GeoTIFF image, and you can click on the image to add waypoints. Each click will:
 
@@ -90,7 +90,8 @@ Waypoints can be exported to a file format compatible with mission planning soft
 ### Example of Exported Waypoint Format:
 
 ```
-0 1 3 16 0 0 0 0 41.0358872 -83.3071187 256.010000 1 1 0 3 16 0.00000000 0.00000000 0.00000000 0.00000000 41.03609760 -83.30700870 100.000000 1
+0 1 3 16 0 0 0 0 41.0358872 -83.3071187 256.010000 1
+1 0 3 16 0.00000000 0.00000000 0.00000000 0.00000000 41.03609760 -83.30700870 100.000000 1
 ```
 
 ### 4. Logging Output (Debugging)
@@ -117,4 +118,4 @@ This will update the file with the latest versions of the installed packages.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the AGPL-3.0 license - see the [LICENSE](LICENSE) file for details.
