@@ -33,7 +33,11 @@ def onclick(event):
         waypoints.append(waypoint)
         
         # Plot the waypoint on the map
-        ax.plot(event.xdata, event.ydata, 'ro', markersize=8, label="Waypoint" if len(waypoints) == 1 else "")
+        ax.plot(event.xdata, event.ydata, 'ro', markersize=6, label="Waypoint" if len(waypoints) == 1 else "")
+        
+        # Annotate the point with its number
+        ax.text(event.xdata, event.ydata, str(len(waypoints)), color='yellow', fontsize=12, ha='left', va='bottom')
+
         fig.canvas.draw()  # Redraw the figure to show the point
         
         # Print feedback to the console
