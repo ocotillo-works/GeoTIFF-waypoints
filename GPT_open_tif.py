@@ -13,6 +13,12 @@ from shapely.geometry import Point
 import pyproj
 from rasterio.warp import transform
 import sys
+import logging
+
+
+
+# How much LOG??
+LOG_LEVEL=logging.INFO
 
 # Path to your GeoTIFF file
 geo_tiff_path = "./images/ESPG-4326-orthophoto.tif"
@@ -21,15 +27,42 @@ geo_tiff_path = "./images/ESPG-4326-orthophoto.tif"
 waypoints = []
 
 
+# Prepare file logging
+def setup_logger(name="waypoint_logger", log_level=logging.DEBUG):
+    """
+    Set up a logger for the script with a given name and log level.
+    
+    Args:
+    - name (str): Name of the logger.
+    - log_level (int): Logging level (e.g., logging.DEBUG, logging.INFO).
+    
+    Returns:
+    - logger (logging.Logger): Configured logger instance.
+    """
+    # Create a custom logger
+    logger = logging.getLogger("waypoint_logger")
+    logger.setLevel(logging.DEBUG)  # Set the base level for your logger
+
+    # Create a console handler for output
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)  # Set the handler's log level
+
+    # Create a formatter and associate it with the handler
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    console_handler.setFormatter(formatter)
+
+    # Add the handler to the custom logger
+    logger.addHandler(console_handler)
+    return logger
+
+
 # Coordinate Reference System
 # Function to reproject from the image's CRS to WGS84 (EPSG:4326)
 def reproject_to_wgs84(x, y, src_crs, dst_crs='EPSG:4326'):
     """Reproject coordinates from one CRS to another (WGS84 by default)."""
-
-    print(f"CRS: {src_crs}, {dst_crs}")
-
+    logger.debug(f"src_crs: {src_crs}, dst_crs: {dst_crs}")
     if (src_crs == dst_crs):
-        print(f"Same CRS: {src_crs}")
+        logger.debug(f"Same CRS: {src_crs}")
         return x,y
 
     # Use pyproj to reproject coordinates
@@ -44,23 +77,15 @@ def onclick(event):
     if plt.get_current_fig_manager().toolbar.mode == '' and event.inaxes:
         x_pixel, y_pixel = event.xdata, event.ydata # Get pixel coordinates from the click
         
-        # Debug: Print event coordinates
-        print(f"Clicked pixel coordinates: x={x_pixel}, y={y_pixel}")
-        
-        geo_coords = dataset.xy(y_pixel, x_pixel)  # This converts pixel to geographic coordinates
-        lat, lon = reproject_to_wgs84(geo_coords[0], geo_coords[1], dataset.crs)
+        # geo_coords = dataset.xy(y_pixel, x_pixel)  # This converts pixel to geographic coordinates
+        lon, lat = reproject_to_wgs84(x_pixel, y_pixel, dataset.crs)
+
+        logger.debug(f"Clicked pixel coordinates: x={x_pixel}, y={y_pixel}")
+        logger.debug(f"Interpreted geographic coordinates (WGS84): lat={lat}, lon={lon}")
+
+        # Create and store waypoint
         waypoint_geo = Point(lon, lat)  # Shapely Point (for geographic reference)
-        
-        # Debug: Print raw geographic coordinates
-        print(f"Raw geographic coordinates (source CRS): {geo_coords}")
-
-        # Debug: Print reprojected geographic coordinates
-        print(f"Reprojected coordinates (WGS84): lat={lat}, lon={lon}")
-
-        # Generate the waypoint number
         waypoint_number = len(waypoints) + 1
-
-        # Store both the pixel coordinates and geographic coordinates
         waypoint = {
             'number': waypoint_number,
             'pixel': (event.xdata, event.ydata),
@@ -68,41 +93,39 @@ def onclick(event):
         }
         waypoints.append(waypoint)
         
-
-        ax.plot(event.xdata, event.ydata, 'ro', markersize=6) # Plot the waypoint on the map        
-        # Annotate the point with its number
+        # Plot and annotate the waypoint
+        ax.plot(event.xdata, event.ydata, 'ro', markersize=6)     
         ax.text(event.xdata, event.ydata, str(waypoint_number), color='yellow', fontsize=10, ha='left', va='bottom')
         
-        # If there are at least two points, draw a line between the last two waypoints (using pixel coordinates)
+        # Draw lines with arrows between waypoints
         if len(waypoints) > 1:
             prev_x, prev_y = waypoints[-2]['pixel']
             curr_x, curr_y = waypoints[-1]['pixel']
-            
-            # Draw a line between the last two waypoints using pixel coordinates
-            # ax.plot([prev_x, curr_x], [prev_y, curr_y], 'g-', linewidth=1)  # Green line
-            
-            # Draw an arrow between the last two waypoints using pixel coordinates
             ax.annotate('', xy=(curr_x, curr_y), xytext=(prev_x, prev_y),
                         arrowprops=dict(facecolor='green', edgecolor='green', arrowstyle='->', lw=1))  # Green arrow
-
 
         # Redraw the figure to show the point and the line
         fig.canvas.draw()
         
-        # Print feedback to the console (show both pixel and geographic coordinates)
-        print(f"Added waypoint {len(waypoints)}:")
-        print(f"  Pixel Coordinates: {waypoints[-1]['pixel']}")
-        print(f"  Geographic Coordinates: {waypoints[-1]['geo']}")
-        sys.stdout.flush()  # Force the console to update immediately
+        # Log waypoint info
+        logger.info(f"Added waypoint {waypoint_number}:")
+        logger.info(f"  Pixel Coordinates: {waypoints[-1]['pixel']}")
+        logger.info(f"  Geographic Coordinates: {waypoints[-1]['geo']}")
+        # sys.stdout.flush()  # Force the console to update immediately
 
-        
+
+# ========================================
+# Main Business
+# ========================================
+logger = setup_logger(name="waypoint_logger", log_level=LOG_LEVEL)
+
 # Open the GeoTIFF file
 with rasterio.open(geo_tiff_path) as dataset:
     # Get transformation data for georeferencing
     transform = dataset.transform
 
     # Plot the GeoTIFF
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(12, 12))
     show(dataset, ax=ax, title="Click to Add Waypoints")
 
     # Add a crosshair cursor for precision
@@ -115,9 +138,6 @@ with rasterio.open(geo_tiff_path) as dataset:
     except AttributeError:
         mng.resize(*mng.window.maxsize())  # For other backends, resize to screen size
 
-
-    print("Source CRS:", dataset.crs)
-
     # Connect the onclick event to the plot
     fig.canvas.mpl_connect('button_press_event', onclick)
     plt.show()
@@ -125,9 +145,9 @@ with rasterio.open(geo_tiff_path) as dataset:
 
 
 # Print all waypoints after the interaction
-print("Waypoints (georeferenced):")
+logger.debug("Waypoints (georeferenced):")
 for waypoint in waypoints:
-    print(waypoint)
+    logger.debug(waypoint)
 
 
 # Export waypoints to MAVLink .waypoints file
@@ -147,6 +167,6 @@ with open(waypoints_filename, 'w') as f:
         # Waypoint command = 16
         f.write(f"{index}\t0\t0\t16\t0\t0\t0\t0\t{waypoint['geo'].y}\t{waypoint['geo'].x}\t100.000000\t1\n")
 
-print(f"\nWaypoints have been exported to {waypoints_filename}")
+logger.info(f"\nWaypoints have been exported to {waypoints_filename}")
 
 
